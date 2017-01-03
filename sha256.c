@@ -170,6 +170,14 @@ sha256_hash(unsigned char *buf, const unsigned char *data, size_t size)
   sha256_final(&hash, buf);
 }
 
+void
+sha256_hash_le(unsigned char *buf, const unsigned char *data, size_t size)
+{
+  sha256_t hash;
+  sha256_init(&hash);
+  sha256_update(&hash, data, size);
+  sha256_final_le(&hash, buf);
+}
 
 void
 sha256_update(sha256_t *p, const unsigned char *data, size_t size)
@@ -188,34 +196,57 @@ sha256_update(sha256_t *p, const unsigned char *data, size_t size)
   }
 }
 
-
+static void
+sha256_finalize(sha256_t *p)
+{
+	uint64_t lenInBits = (p->count << 3);
+	uint32_t curBufferPos = (uint32_t)p->count & 0x3F;
+	unsigned i;
+	p->buffer[curBufferPos++] = 0x80;
+	while (curBufferPos != (64 - 8))
+	{
+	curBufferPos &= 0x3F;
+	if (curBufferPos == 0)
+	  sha256_write_byte_block(p);
+	p->buffer[curBufferPos++] = 0;
+	}
+	for (i = 0; i < 8; i++)
+	{
+	p->buffer[curBufferPos++] = (unsigned char)(lenInBits >> 56);
+	lenInBits <<= 8;
+	}
+	sha256_write_byte_block(p);
+}
 void
 sha256_final(sha256_t *p, unsigned char *digest)
 {
-  uint64_t lenInBits = (p->count << 3);
-  uint32_t curBufferPos = (uint32_t)p->count & 0x3F;
+  sha256_finalize(p);
   unsigned i;
-  p->buffer[curBufferPos++] = 0x80;
-  while (curBufferPos != (64 - 8))
-  {
-    curBufferPos &= 0x3F;
-    if (curBufferPos == 0)
-      sha256_write_byte_block(p);
-    p->buffer[curBufferPos++] = 0;
-  }
-  for (i = 0; i < 8; i++)
-  {
-    p->buffer[curBufferPos++] = (unsigned char)(lenInBits >> 56);
-    lenInBits <<= 8;
-  }
-  sha256_write_byte_block(p);
-
   for (i = 0; i < 8; i++)
   {
     *digest++ = (unsigned char)(p->state[i] >> 24);
     *digest++ = (unsigned char)(p->state[i] >> 16);
     *digest++ = (unsigned char)(p->state[i] >> 8);
     *digest++ = (unsigned char)(p->state[i]);
+  }
+  sha256_init(p);
+}
+
+/**
+ * @param digest location to store little endian version of sha
+ * hash
+ */
+void
+sha256_final_le(sha256_t *p, unsigned char *digest)
+{
+  sha256_finalize(p);
+  unsigned i;
+  for (i = 0; i < 8; i++)
+  {
+    *digest++ = (unsigned char)(p->state[7-i]);
+    *digest++ = (unsigned char)(p->state[7-i] >> 8);
+    *digest++ = (unsigned char)(p->state[7-i] >> 16);
+    *digest++ = (unsigned char)(p->state[7-i] >> 24);
   }
   sha256_init(p);
 }
