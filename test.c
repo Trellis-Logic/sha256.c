@@ -18,14 +18,27 @@ unsigned char empty_hashed[] = {
   0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55
 };
 
+void be_buf_to_le_buff(unsigned char *le_buff, unsigned char *be_buff, size_t size)
+{
+  int i=0;
+  for( i=0; i<size; i++ )
+  {
+  	le_buff[i]=be_buff[size-1-i];
+  }
+}
 int main (void) {
-  plan(2);
+  plan(4);
 
   unsigned char buf[32] = {0};
-
+  unsigned char hashed_le[32] = {0};
   sha256_hash(buf, (unsigned char*)"hello", 5);
   note("basic stuff");
   ok(memcmp(buf, hello_hashed, 32) == 0, "should hash correctly");
+
+  be_buf_to_le_buff(hashed_le,hello_hashed,32);
+  sha256_hash_le(buf, (unsigned char*)"hello", 5);
+  ok(memcmp(buf, hashed_le, 32) == 0, "should hash correctly in little endian format");
+
 
   sha256_t hash;
   sha256_init(&hash);
@@ -35,5 +48,12 @@ int main (void) {
 
   ok(memcmp(buf, empty_hashed, 32) == 0, "empty should hash correctly");
 
+  be_buf_to_le_buff(hashed_le,empty_hashed,32);
+  sha256_init(&hash);
+  sha256_update(&hash, (unsigned char*)"", 0);
+  sha256_update(&hash, (unsigned char*)"", 0);
+  sha256_final_le(&hash, buf);
+
+  ok(memcmp(buf, hashed_le, 32) == 0, "empty should hash correctly in little endian format");
   done_testing();
 }
